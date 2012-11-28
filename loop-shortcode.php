@@ -25,6 +25,9 @@
 class CTLT_Loop_Shortcode {
 	
 	public $odd_or_even = 0;
+	public $content = '';
+	public $loop_attributes = array();
+	public $error = null;
 	
 	/**
 	 * __construct function.
@@ -44,6 +47,18 @@ class CTLT_Loop_Shortcode {
 		
 	}
 	
+	function has_shortcode( $shortcode ){
+		global $shortcode_tags;
+		return ( in_array( $shortcode, $shortcode_tags ) ? true : false);
+	}
+	
+	function add_shortcode( $shortcode, $shortcode_function ){
+	
+		if( !$this->has_shortcode( $shortcode ) )
+			add_shortcode( $shortcode, array( &$this, $shortcode_function ) );
+		
+	}
+	
 	/**
 	 * register_shortcode function.
 	 * 
@@ -52,7 +67,12 @@ class CTLT_Loop_Shortcode {
 	 */
 	public function register_shortcode() {
 		
-		add_shortcode( 'loop', array( &$this, 'loop_shortcode' ) );
+		/* don't do anything if the shortcode exists already */
+		$this->add_shortcode( 'loop', 'loop_shortcode' );
+		
+		
+		
+		
 	}
 	
 	/**
@@ -65,356 +85,281 @@ class CTLT_Loop_Shortcode {
 	 */
 	public function loop_shortcode( $atts, $content = null ) {
 	
-		$atts['pagination'] = ( isset($atts['pagination']) ? (bool)$atts['pagination']: false );
-		extract(shortcode_atts(array(
+		// $atts['pagination'] = ( isset($atts['pagination']) ? (bool)$atts['pagination']: false );
+		
+		// $this->loop_attributes = array(); // always start with an empty array
+		
+		$this->content = $content;
+		$this->loop_attributes = shortcode_atts(array(
 				"query" => '',	
-				"rss" => '',
-				"view" =>'default',
+				"rss" 	=> '',
+				"view" 	=>'default',
 				"pagination" => false,
-				"num" => 5,
-				"error"=>'',
-				'taxonomy'=>''
-			), $atts));
+				"num" 	=> 5,
+				"error"	=>'',
+				"taxonomy"=>''
+			), $atts );
 			
 		
-		if($query=='' && $rss=='') { return '<p class="no-data">'._e('Please specify a query for your [loop] shortcode.', 'hybrid').'</p>'; }
-		
-		
-		// THIS IS A HACK TO GET RID OF TRAILING OPEN <p> TAGS
-		$test_p_tag = substr($content, -3);
-		if($test_p_tag == "<p>") { $content = substr($content, 0, -3); }
-		// END HACK
+		if( empty( $this->loop_attributes['query'] ) && empty( $this->loop_attributes['rss'] ) ) {
+			return '<span class="error no-data">'.__('Please specify a query for your [loop] shortcode.', 'loop-shortcode').'</span>';
+		}
 		
 		ob_start();
 		
-		if($query!=''):
-			clf_base_loop_wploop($query, $content,$view,$pagination);
-		elseif($rss!=''):
-			$rss = html_entity_decode($rss); 
-			clf_base_loop_rssloop($rss, $content,$view,$num);
+		if( !empty( $this->loop_attributes['query'] ) ):
+			
+			$this->wp_loop();
+			
+		elseif( $rss!=''):
+			$rss = html_entity_decode( $rss );
+			
+			$this->rss_loop();
+		endif;
+				
+		return 	ob_get_clean();
+	}
+	
+	
+	/**
+	 * wp_loop function.
+	 * 
+	 * @access public
+	 * @return void
+	 */
+	function wp_loop(){
+		
+		// de-funkify $query - taken from http://digwp.com/2010/01/custom-query-shortcode/ needed to get it working better ideas ?
+		$query = html_entity_decode( $this->loop_attributes['query'] );
+		$query = preg_replace('~&#x0*([0-9a-f]+);~ei', 'chr(hexdec("\\1"))', $query);
+		$query = preg_replace('~&#0*([0-9]+);~e', 'chr(\\1)', $query);
+		
+		if( $this->loop_attributes['pagination'] ):
+			$query .= "&paged=".get_query_var( 'paged' );
 		endif;
 		
-		return ob_get_clean();
+		$loop_query = new WP_Query( $query );
+		
+		if ( $loop_query->have_posts() ) : 
+			while ( $loop_query->have_posts() ) : $loop_query->the_post();
+				
+				$this->display_output();
+				$this->odd_or_even++;
+				
+			endwhile; 
+			
+			$this->paginate();
+			
+		else: 
+			$this->show_error();
+		endif;
+				
+		wp_reset_query();
+		
 	}
-
-
-
-
-}
-
-$clf_base_odd_or_even = 0;
-add_shortcode("odd-even","clf_base_odd_even_shortcode");
-function clf_base_odd_even_shortcode(){
-	global $clf_base_odd_or_even;
-	if ( $clf_base_odd_or_even % 2 )
-		return 'odd';
-	else
-		return 'even alt';
-
-}
-
-add_shortcode("post-class","clf_base_post_class_shortcode");
-function clf_base_post_class_shortcode() {
-	ob_start();
-		hybrid_entry_class();
-	return ob_get_clean();
-}
-
-
-
-function clf_base_loop_rssloop($url, $content, $view,$num) {
-	global $clf_base_odd_or_even;
 	
-	$rss_mock_query = new WP_Query('cat=111111111111111111');
+	/**
+	 * rss_loop function.
+	 * 
+	 * @access public
+	 * @return void
+	 */
+	function rss_loop(){
+		global $clf_base_odd_or_even;
 	
-	$rss = fetch_feed($url);
-	if (!is_wp_error( $rss ) ) : 
-		$maxitems = $rss->get_item_quantity($num);
-		$rss_items = $rss->get_items(0, $maxitems);
+		$rss_mock_query = new WP_Query('cat=111111111111111111');
 		
-	endif;
-	
-	$found_posts = 0;
-	foreach ($rss_items as $item):
-	
+		$rss = fetch_feed( $this->loop_attributes['rss'] );
 		
-		$post = (object) null;
-		$post->ID = $item->get_id();
-		$post->type = 'feed_item';
-		$post->post_title = $item->get_title();
-		$post->guid = $item->get_permalink();
-		$post->post_content = $item->get_content();
-		$post->post_excerpt = $item->get_description();
-		$post->post_date = $item->get_date('Y-m-d H:i:s');
-		$post->post_content_filtered = $item;
-		$rss_mock_query->post = $post;
+		// todo: make pagination work for rss as well 
 		
-		array_push($rss_mock_query->posts, $post);
-		$found_posts++;
+		if (!is_wp_error( $rss ) ) : 
+			
+			$maxitems = $rss->get_item_quantity( $this->loop_attributes['num'] );
+			
+			$rss_items = $rss->get_items(0, $maxitems);
+			
+		endif;
+		
+		$found_posts = 0;
+		foreach ($rss_items as $item):
+		
+			
+			$post = (object) null;
+			$post->ID = $item->get_id();
+			$post->type = 'feed_item';
+			$post->post_title = $item->get_title();
+			$post->guid = $item->get_permalink();
+			$post->post_content = $item->get_content();
+			$post->post_excerpt = $item->get_description();
+			$post->post_date = $item->get_date('Y-m-d H:i:s');
+			$post->post_content_filtered = $item;
+			$rss_mock_query->post = $post;
+			
+			array_push($rss_mock_query->posts, $post);
+			$found_posts++;
+			
 		endforeach;
+		
 		$rss_mock_query->post_count = $found_posts;
 		$rss_mock_query->found_posts = ''.$found_posts;
 		
+		
 		if ( $rss_mock_query->have_posts() ) : 
 			while ( $rss_mock_query->have_posts() ) : $rss_mock_query->the_post();
-				$clf_base_odd_or_even++;
-				if($content):
-					//echo "<!-- begin raw -->".$content."<!-- end raw -->";
-					echo do_shortcode( trim($content) );
-				else:
-					clf_base_loop_default_output($view);
-				endif;
+				
+				$this->display_output();
+				$this->odd_or_even++;
+				
 			endwhile; 
+			
+			
+			$this->paginate();
+			
 		else: 
-		?>
-			<p class="no-data">
-			<?php if(empty($error)):
-					 _e('Sorry, no posts matched your criteria.', 'hybrid');
-				 else:
-				 	echo $error;	
-				 endif;
-			?>
-			</p><!-- .no-data -->
-		<?php
+			$this->show_error();
 		endif;
-	wp_reset_query();
-
-}
-
-function clf_base_loop_wploop($query, $content,$view,$pagination = false) {
-	global $clf_base_odd_or_even;
-	// de-funkify $query - taken from http://digwp.com/2010/01/custom-query-shortcode/ needed to get it working better ideas ?
-	$query = html_entity_decode($query);
-	$query = preg_replace('~&#x0*([0-9a-f]+);~ei', 'chr(hexdec("\\1"))', $query);
-	$query = preg_replace('~&#0*([0-9]+);~e', 'chr(\\1)', $query);
-	if($pagination):
-		$query .= "&paged=".get_query_var('paged');
-	endif;
-	$loop_query = new WP_Query($query);
-	
-	if ( $loop_query->have_posts() ) : 
-		while ( $loop_query->have_posts() ) : $loop_query->the_post();
-			$clf_base_odd_or_even++;
-			if($content):
-				
-				echo do_shortcode( $content );
-			else:
-				
-				clf_base_loop_default_output($view);
-			endif;
-		endwhile; 
 		
-	else: 
-	?>
-		<p class="no-data">
-		<?php if(empty($error)):
-					 _e('Sorry, no posts matched your criteria.', 'hybrid');
-				 else:
-				 	echo $error;	
-				 endif;
-			?></p><!-- .no-data -->
+		wp_reset_query();
 
-	<?php
-	endif;
-	if($pagination):
-			echo "<div class='loop-pagination pagination'>";
-			clf_base_paginate($loop_query);
-			echo "</div>";
-	endif;
-	wp_reset_query();
-}
-
-function clf_base_paginate($loop_query = false) {
-	global $wp_query, $wp_rewrite;
-	if($loop_query):
-		$loop_query->query_vars['paged'] > 1 ? $current = $loop_query->query_vars['paged'] : $current = 1;
-		
-		$pagination = array(
-			'base' => @add_query_arg('page','%#%'),
-			'format' => '',
-			'total' => $loop_query->max_num_pages,
-			'current' => $current,
-			'show_all' => true,
-			'type' => 'list',
-			'next_text' => '&raquo;',
-			'prev_text' => '&laquo;'
-		);
-		if( !empty($loop_query->query_vars['s']) ):
-			$pagination['add_args'] = array( 's' => get_query_var( 's' ) );
-		endif;
-	else:
-		$wp_query->query_vars['paged'] > 1 ? $current = $wp_query->query_vars['paged'] : $current = 1;
-		$pagination = array(
-			'base' => @add_query_arg('page','%#%'),
-			'format' => '',
-			'total' => $wp_query->max_num_pages,
-			'current' => $current,
-			'show_all' => true,
-			'type' => 'list',
-			'next_text' => '&raquo;',
-			'prev_text' => '&laquo;'
-		);
-		if( !empty($wp_query->query_vars['s']) )
-			$pagination['add_args'] = array( 's' => get_query_var( 's' ) );
-
- 	endif;
-	 
-	if( $wp_rewrite->using_permalinks() )
-		$pagination['base'] = user_trailingslashit( trailingslashit( remove_query_arg( 's', get_pagenum_link( 1 ) ) ) . 'page/%#%/', 'paged' );
- 
-	echo paginate_links( $pagination );
-}
-/**
- * clf_base_loop_default_output function.
- * 
- * @access public
- * @param mixed $view
- * @return void
- */
-function clf_base_loop_default_output($view) {
-	switch($view)
-	{
-	case "full":
-		clf_base_loop_output_full();
-	break;
 	
-	case "archive":
-		clf_base_loop_output_archive();
-	break;
-	
-	case "list":
-		clf_base_loop_output_list();
-	break;
-	
-	default:
-		clf_base_loop_output_full();
 	}
-}
-/**
- * clf_base_loop_output_full function.
- * 
- * @access public
- * @return void
- */
-function clf_base_loop_output_full() {
-	if($post->ID == "rss"): ?>
-		<div class="<?php hybrid_entry_class(); ?>">
 	
-		<?php hybrid_before_entry(); // Before entry hook ?>
 		
-		<div class="entry-content">
-			<?php the_content( sprintf( __('Continue reading %1$s', 'hybrid'), the_title( ' "', '"', false ) ) ); ?>
-		</div><!-- .entry-content -->
+	/**
+	 * display_output function.
+	 * 
+	 * @access public
+	 * @return void
+	 */
+	function display_output(){
 		
-		</div><!-- .hentry -->
-	
-	<?php else: ?>
-		<div id="post-<?php the_ID(); ?>" class="<?php hybrid_entry_class(); ?>">
-	
-		<?php hybrid_before_entry(); // Before entry hook ?>
-		
-		<div class="entry-content">
-			<?php the_content( sprintf( __('Continue reading %1$s', 'hybrid'), the_title( ' "', '"', false ) ) ); ?>
-			<?php wp_link_pages( array( 'before' => '<p class="pages">' . __('Pages:', 'hybrid'), 'after' => '</p>' ) ); ?>
-		</div><!-- .entry-content -->
-		
-		<?php hybrid_after_entry(); // After entry hook ?>
-	
-		</div><!-- .hentry -->
-		<?php 
-	endif;
-
-}
-/**
- * clf_base_loop_output_archive function.
- * 
- * @access public
- * @return void
- */
-function clf_base_loop_output_archive() {
-	global $post;
-	if($post->ID == "rss"): ?>
-	
-		<div class="<?php hybrid_entry_class(); ?>">
-		
-	
-		<?php hybrid_before_entry(); // Before entry hook ?>
-	
-		<div class="entry-summary">
-			<?php the_excerpt(); ?>
-		</div><!-- .entry-summary -->
-	
-	
-		</div><!-- .hentry -->
-	<?php else: ?>
-		<div id="post-<?php the_ID(); ?>" class="<?php hybrid_entry_class(); ?>">
-		
-		<?php get_the_image( array( 'custom_key' => array( 'Thumbnail' ), 'size' => 'thumbnail' ) ); ?> <!-- thumbnail -->
-	
-		<?php hybrid_before_entry(); // Before entry hook ?>
-	
-		<div class="entry-summary">
-			<?php the_excerpt(); ?>
-		</div><!-- .entry-summary -->
-	
-		<?php hybrid_after_entry(); // After entry hook ?>
-	
-		</div><!-- .hentry -->
-	<?php
-	endif;
-}
-
-
-function clf_base_loop_output_list() {
-?>
-	<li  class="<?php echo clf_base_odd_even_shortcode(); ?>"><a href="<?php the_permalink();?> "><?php the_title(); ?></a></li>
-<?php
-}
-
-
-
-
-// Hacks permalinks so that the permalink() template function will work when displaying RSS entries.
-function clf_base_loop_permalink_filter($permalink) {
-	global $post;
-	if($post->type=='feed_item') { $permalink = $post->guid; }
-	return $permalink;
-}
-add_filter('post_link', 'clf_base_loop_permalink_filter');
-
-
-
-add_filter('post_thumbnail_html', 'clf_base_loop_post_thumbnail_html',10,5);
-function clf_base_loop_post_thumbnail_html($html, $post_id, $post_thumbnail_id, $size, $attr ) {
-	global $post;
-	if($post->type=='feed_item'):
-		if($enclosure = $post->post_content_filtered->get_enclosure()):
+		if( $this->content ):
 			
-			if($size == 'post-thumbnail'){
-				$html = '<img class="feed-thumb post-thumbnail" src="'.$enclosure->thumbnails[0].'" />';
+			echo apply_filters( $this->content );
+					
+		else:
+			switch( $this->loop_attributes['view'] ){
+				
+				case "archive":
+					$this->archive_output();
+				break;
+				
+				case "list":
+					$this->list_output();
+				break;
+				case "full":
+					$this->full_output();
+				break;
+				default:
+					$this->default_output();
+				break;
 			
-			}else{
-				$html = '<img class="feed-image post-full"src="'.$enclosure->link.'" alt="" />';
 			}
 			
-		endif;
+			
 		
-	endif;
+		endif;
 	
-	return $html;
-}
-
-/** 
- * Gets post tags in plain text
- */
-function ah_arts_get_plain_tags() {
-
-	$posttags = get_the_tags();
-	if ($posttags) {
-		foreach($posttags as $tag) {
-			$htmlstr .= $tag->name . ' '; 
-		}
 	}
-	return $htmlstr;
+	
+	function show_error(){
+		?>
+		<p class="no-data">
+			<?php 
+			if( empty( $this->error ) ):
+				 _e('Sorry, no posts matched your criteria.', 'loop-shortcode');
+			 else:
+			 	echo $this->error;	
+			 endif;
+				?>
+		</p><!-- .no-data -->
+		<?php 
+	}
+	
+	/**
+	 * default_output function.
+	 * 
+	 * @access public
+	 * @return void
+	 */
+	function default_output() {
+		
+
+	}
+	
+	/**
+	 * archive_output function.
+	 * 
+	 * @access public
+	 * @return void
+	 */
+	function archive_output() {
+	
+		?>
+		<div id="post-<?php the_ID(); ?>" <?php post_class(); ?>>
+			<h2 class="post-title entry-title"><a href="<?php the_permalink(); ?>" title="<?php the_title_attribute(); ?>"><?php the_title(); ?></a></h2>
+			
+			<div class="entry-content">
+				<?php the_excerpt(); ?>
+			</div><!-- .entry-content -->
+				
+		</div><!-- .hentry -->
+		<?php 
+	}
+	
+	
+	/**
+	 * list_output function.
+	 * 
+	 * @access public
+	 * @return void
+	 */
+	function list_output() {
+		?>
+		<li><a href="<?php the_permalink(); ?>" title="<?php the_title_attribute(); ?>"><?php the_title(); ?></a></li>
+		<?php 
+	}
+	
+	
+	/**
+	 * full_output function.
+	 * 
+	 * @access public
+	 * @return void
+	 */
+	function full_output() { ?>
+		<div id="post-<?php the_ID(); ?>" <?php post_class(); ?>>
+			<h2 class="post-title entry-title"><a href="<?php the_permalink(); ?>" title="<?php the_title_attribute(); ?>"><?php the_title(); ?></a></h2>
+			
+			<div class="entry-content">
+				<?php the_content(); ?>
+			</div><!-- .entry-content -->
+				
+		</div><!-- .hentry -->
+		<?php 
+	}
+	
+	/**
+	 * paginate function.
+	 * 
+	 * @access public
+	 * @param mixed $loop_query
+	 * @return void
+	 */
+	function paginate() {
+		
+		if( $this->loop_attributes['pagination'] ):
+			
+			
+			
+		endif;
+	}
+	
+	
+	
+	
+
 }
-add_shortcode('the_plain_tags','ah_arts_get_plain_tags');
+
+new CTLT_Loop_Shortcode();
