@@ -22,12 +22,17 @@
 * @license http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 */
 
+
+/**
+ * CTLT_Loop_Shortcode class.
+ */
 class CTLT_Loop_Shortcode {
 	
 	public $odd_or_even = 0;
 	public $content = '';
 	public $loop_attributes = array();
 	public $error = null;
+	public $loop_query;
 	
 	/**
 	 * __construct function.
@@ -44,14 +49,76 @@ class CTLT_Loop_Shortcode {
 		add_filter( 'loop_content', 'wpautop' );
 		add_filter( 'loop_content', 'shortcode_unautop' );
 		add_filter( 'loop_content', 'do_shortcode' );
+
+		add_filter( 'post_link', array( &$this,'feed_permalink_filter' ) );
+		add_filter( 'post_thumbnail_html',  array( &$this,'feed_post_thumbnail_html' ) , 10 , 5 );
 		
 	}
 	
+	/**
+	 * loop_permalink_filter function.
+	 * Hacks permalinks so that the permalink() template function will work when displaying RSS entries.
+	 * @access public
+	 * @param mixed $permalink
+	 * @return void
+	 */
+	function feed_permalink_filter( $permalink ) {
+		global $post;
+		if( $post->type=='feed_item' ) { $permalink = $post->guid; }
+		return $permalink;
+	}
+	
+	/**
+	 * feed_post_thumbnail_html function.
+	 * 
+	 * @access public
+	 * @param mixed $html
+	 * @param mixed $post_id
+	 * @param mixed $post_thumbnail_id
+	 * @param mixed $size
+	 * @param mixed $attr
+	 * @return void
+	 */
+	function feed_post_thumbnail_html( $html, $post_id, $post_thumbnail_id, $size, $attr ) {
+		global $post;
+		if($post->type=='feed_item'):
+			if($enclosure = $post->post_content_filtered->get_enclosure()):
+				
+				if($size == 'post-thumbnail'){
+					$html = '<img class="feed-thumb post-thumbnail" src="'.$enclosure->thumbnails[0].'" />';
+				
+				}else{
+					$html = '<img class="feed-image post-full"src="'.$enclosure->link.'" alt="" />';
+				}
+				
+			endif;
+			
+		endif;
+	
+		return $html;
+	}
+
+	
+	/**
+	 * has_shortcode function.
+	 * 
+	 * @access public
+	 * @param mixed $shortcode
+	 * @return void
+	 */
 	function has_shortcode( $shortcode ){
 		global $shortcode_tags;
 		return ( in_array( $shortcode, $shortcode_tags ) ? true : false);
 	}
 	
+	/**
+	 * add_shortcode function.
+	 * 
+	 * @access public
+	 * @param mixed $shortcode
+	 * @param mixed $shortcode_function
+	 * @return void
+	 */
 	function add_shortcode( $shortcode, $shortcode_function ){
 	
 		if( !$this->has_shortcode( $shortcode ) )
@@ -69,10 +136,22 @@ class CTLT_Loop_Shortcode {
 		
 		/* don't do anything if the shortcode exists already */
 		$this->add_shortcode( 'loop', 'loop_shortcode' );
-		
-		
-		
-		
+		$this->add_shortcode( 'odd-even', 'odd_even_shortcode' );
+	}
+	
+	/**
+	 * odd_even_shortcode function.
+	 * 
+	 * @access public
+	 * @return void
+	 */
+	public function odd_even_shortcode(){
+	
+		if ( $this->odd_or_even % 2 )
+			return 'odd';
+		else
+			return 'even alt';
+
 	}
 	
 	/**
@@ -138,10 +217,10 @@ class CTLT_Loop_Shortcode {
 			$query .= "&paged=".get_query_var( 'paged' );
 		endif;
 		
-		$loop_query = new WP_Query( $query );
+		$this->loop_query = new WP_Query( $query );
 		
-		if ( $loop_query->have_posts() ) : 
-			while ( $loop_query->have_posts() ) : $loop_query->the_post();
+		if ( $this->loop_query->have_posts() ) : 
+			while ( $this->loop_query->have_posts() ) : $this->loop_query->the_post();
 				
 				$this->display_output();
 				$this->odd_or_even++;
@@ -252,7 +331,7 @@ class CTLT_Loop_Shortcode {
 					$this->full_output();
 				break;
 				default:
-					$this->default_output();
+					$this->full_output();
 				break;
 			
 			}
@@ -294,18 +373,36 @@ class CTLT_Loop_Shortcode {
 	 * @access public
 	 * @return void
 	 */
-	function archive_output() {
+	function archive_output() { ?>
 	
-		?>
-		<div id="post-<?php the_ID(); ?>" <?php post_class(); ?>>
-			<h2 class="post-title entry-title"><a href="<?php the_permalink(); ?>" title="<?php the_title_attribute(); ?>"><?php the_title(); ?></a></h2>
+	<div id="post-<?php the_ID(); ?>" <?php post_class(); ?>>
+	<?php if( function_exists( 'do_atomic' ) ): ?>
+			<?php do_atomic( 'before_entry' ); // hybrid_before_entry ?>
+
+				<div class="entry-content">
+					<?php the_excerpt( sprintf( __( 'Continue reading %1$s', 'hybrid' ), the_title( ' "', '"', false ) ) ); ?>
+					<?php wp_link_pages( array( 'before' => '<p class="page-links pages">' . __( 'Pages:', 'hybrid' ), 'after' => '</p>' ) ); ?>
+				</div><!-- .entry-content -->
+
+				<?php do_atomic( 'after_entry' ); // hybrid_after_entry ?>
 			
+			<?php else: ?>
 			<div class="entry-content">
+				<div class="entry-header">
+					<h2 class="post-title entry-title"><a href="<?php the_permalink(); ?>" title="<?php the_title_attribute(); ?>"><?php the_title(); ?></a></h2>
+				</div>
 				<?php the_excerpt(); ?>
-			</div><!-- .entry-content -->
+				<?php wp_link_pages( array( 'before' => '<div class="page-links pages">' . __( 'Pages:', 'loop-shortcode' ), 'after' => '</div>' ) ); ?>	
+				<div class="entry-meta">
+				<?php $this->entry_meta(); ?>
+				<?php edit_post_link( __( 'Edit', 'loop-shortcode' ), '<span class="edit-link">', '</span>' ); ?>
 				
-		</div><!-- .hentry -->
-		<?php 
+				</div><!-- .entry-meta -->
+				
+			</div><!-- .entry-content -->
+			<?php endif;  ?>
+			</div><!-- .hentry -->
+		<?php
 	}
 	
 	
@@ -330,16 +427,45 @@ class CTLT_Loop_Shortcode {
 	 */
 	function full_output() { ?>
 		<div id="post-<?php the_ID(); ?>" <?php post_class(); ?>>
-			<h2 class="post-title entry-title"><a href="<?php the_permalink(); ?>" title="<?php the_title_attribute(); ?>"><?php the_title(); ?></a></h2>
+			<?php if( function_exists( 'do_atomic' ) ): ?>
+			<?php do_atomic( 'before_entry' ); // hybrid_before_entry ?>
+
+				<div class="entry-content">
+					<?php the_content( sprintf( __( 'Continue reading %1$s', 'hybrid' ), the_title( ' "', '"', false ) ) ); ?>
+					<?php wp_link_pages( array( 'before' => '<p class="page-links pages">' . __( 'Pages:', 'hybrid' ), 'after' => '</p>' ) ); ?>
+				</div><!-- .entry-content -->
+
+				<?php do_atomic( 'after_entry' ); // hybrid_after_entry ?>
 			
+			<?php else: ?>
 			<div class="entry-content">
+				<div class="entry-header">
+					<h2 class="post-title entry-title"><a href="<?php the_permalink(); ?>" title="<?php the_title_attribute(); ?>"><?php the_title(); ?></a></h2>
+				</div>
 				<?php the_content(); ?>
-			</div><!-- .entry-content -->
+				<?php wp_link_pages( array( 'before' => '<div class="page-links pages">' . __( 'Pages:', 'loop-shortcode' ), 'after' => '</div>' ) ); ?>	
+				<div class="entry-meta">
+				<?php $this->entry_meta(); ?>
+				<?php edit_post_link( __( 'Edit', 'loop-shortcode' ), '<span class="edit-link">', '</span>' ); ?>
 				
+				</div><!-- .entry-meta -->
+				
+			</div><!-- .entry-content -->
+			<?php endif; ?>
 		</div><!-- .hentry -->
 		<?php 
 	}
 	
+	/**
+	 * entry_meta function.
+	 * 
+	 * @access public
+	 * @return void
+	 */
+	function entry_meta(){
+	
+	
+	}
 	/**
 	 * paginate function.
 	 * 
@@ -349,17 +475,59 @@ class CTLT_Loop_Shortcode {
 	 */
 	function paginate() {
 		
-		if( $this->loop_attributes['pagination'] ):
+		if( !$this->loop_attributes['pagination'] )
+			return;
+		
+		global $wp_query, $wp_rewrite;
+		
+		if( $this->loop_query ):
+				
+				$this->loop_query->query_vars['paged'] > 1 ? $current = $this->loop_query->query_vars['paged'] : $current = 1;
 			
+				$pagination = array(
+					'before' => '',
+					'after'  => '',
+					'base' => @add_query_arg('page','%#%'),
+					'format' => '',
+					'total' => $this->loop_query->max_num_pages,
+					'current' => $current,
+					'show_all' => true,
+					'type' => 'list',
+					'next_text' => '&raquo;',
+					'prev_text' => '&laquo;'
+				);
+			if( !empty( $this->loop_query->query_vars['s'] ) ):
+				$pagination['add_args'] = array( 's' => get_query_var( 's' ) );
+			endif;
+		else:
+			$wp_query->query_vars['paged'] > 1 ? $current = $wp_query->query_vars['paged'] : $current = 1;
+			$pagination = array(
+				'before' => '',
+				'after'  => '',
+				'base' => @add_query_arg('page','%#%'),
+				'format' => '',
+				'total' => $wp_query->max_num_pages,
+				'current' => $current,
+				'show_all' => true,
+				'type' => 'list',
+				'next_text' => '&raquo;',
+				'prev_text' => '&laquo;'
+			);
+			if( !empty( $wp_query->query_vars['s'] ) )
+				$pagination['add_args'] = array( 's' => get_query_var( 's' ) );
+	
+	 	endif;
+	 
+		if( $wp_rewrite->using_permalinks() )
+			$pagination['base'] = user_trailingslashit( trailingslashit( remove_query_arg( 's', get_pagenum_link( 1 ) ) ) . 'page/%#%/', 'paged' );
 			
-			
-		endif;
+		$pagination = apply_filters( "loop-shortcode-pagination", $pagination );
+ 		echo $pagination['before'];
+		echo paginate_links( $pagination );
+		echo $pagination['after'];
 	}
 	
 	
-	
-	
-
 }
 
 new CTLT_Loop_Shortcode();
