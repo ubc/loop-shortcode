@@ -55,8 +55,6 @@ class CTLT_Loop_Shortcode {
 		add_filter( 'loop_content', 'do_shortcode' );
 		add_filter( 'loop_content', array( &$this, 'remove_wanted_p' ) );
 		
-	
-		add_filter( 'post_link', array( &$this,'feed_permalink_filter' ) );
 		add_filter( 'post_thumbnail_html',  array( &$this,'feed_post_thumbnail_html' ) , 10 , 5 );
 		add_filter( 'the_author', array( &$this,'feed_post_author' ) , 10 , 5);
 		add_filter( 'the_modified_author', array( &$this,'feed_post_author' ) , 10 , 5);
@@ -526,25 +524,10 @@ class CTLT_Loop_Shortcode {
 	 */
 	function entry_meta(){
 
-
 	}
-		/* helper filters */
-	/**
-	 * loop_permalink_filter function.
-	 * Hacks permalinks so that the permalink() template function will work when displaying RSS entries.
-	 * @access public
-	 * @param mixed $permalink
-	 * @return void
-	 */
-	function feed_permalink_filter( $permalink ) {
-		global $post;
-
-		if( !isset( $post->is_loop_shortcode_feed) )
-			return $permalink;
-
-		return $post->guid;
-	}
-
+	
+	/* helper filters */
+	
 	/**
 	 * feed_post_thumbnail_html function.
 	 *
