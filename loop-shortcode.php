@@ -7,7 +7,7 @@
 * Author: UBC CMS
 * Author URI:http://cms.ubc.ca
 *
-*
+* 
 * This program is free software; you can redistribute it and/or modify it under the terms of the GNU
 * General Public License as published by the Free Software Foundation; either version 2 of the License,
 * or (at your option) any later version.
@@ -18,9 +18,6 @@
 * You should have received a copy of the GNU General Public License along with this program; if not, write
 * to the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 *
-
-
-
 * @license http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 */
 
@@ -37,6 +34,9 @@ class CTLT_Loop_Shortcode {
 	public $error = null;
 	public $loop_query;
 	public $total_pages;
+	public $json_output = array();
+	public $grid_column = 0;
+	public $counter = 0;
 
 	/**
 	 * __construct function.
@@ -170,13 +170,17 @@ class CTLT_Loop_Shortcode {
 				"pagination" => false,
 				"num" 	=> 10,
 				"error"	=>'',
-				"taxonomy"=>''
+				"taxonomy"=>'',
+				'grid_column'=>0
 			), $atts );
 
 		 
 		if( empty( $this->loop_attributes['query'] ) && empty( $this->loop_attributes['rss'] ) ) {
 			return '<span class="error no-data">'.__('Please specify a query for your [ loop ] shortcode.', 'loop-shortcode').'</span>';
 		}
+		
+		if($this->loop_attributes['grid_column'])
+			$this->grid_column = $this->loop_attributes['grid_column'];
 		
 		ob_start();
 
@@ -226,9 +230,18 @@ class CTLT_Loop_Shortcode {
 
 				$this->display_output();
 				$this->odd_or_even++;
+				$this->counter++;
+				
 
 			endwhile;
-
+			// output json 
+			if( !empty( $this->json_output ) && 'json' == $this->loop_attributes['view'] ):
+				echo '<script type="text/javascript" >';
+				echo 'var loop_json = '.json_encode( $this->json_output );
+				echo '</script>';
+				$this->json_output = array();
+			endif;
+			
 			$this->paginate();
 
 		else:
@@ -260,7 +273,6 @@ class CTLT_Loop_Shortcode {
 		else
 			$paged = 0;
 		
-		
 		$start = $num*$paged;
 		
 		// todo: make pagination work for rss as well
@@ -268,7 +280,6 @@ class CTLT_Loop_Shortcode {
 		if (!is_wp_error( $rss ) ) :
 
 			$maxitems = $rss->get_item_quantity();
-			
 			$rss_items = $rss->get_items($start, $num);
 		
 		endif;
@@ -306,6 +317,7 @@ class CTLT_Loop_Shortcode {
 
 				$this->display_output();
 				$this->odd_or_even++;
+				$this->counter++;
 
 			endwhile;
 
@@ -316,8 +328,6 @@ class CTLT_Loop_Shortcode {
 		endif;
 		
 		wp_reset_query();
-
-
 	}
 	
 	/**
@@ -352,16 +362,10 @@ class CTLT_Loop_Shortcode {
 		if( !empty( $this->loop_query->query_vars['s'] ) ):
 			$pagination['add_args'] = array( 's' => get_query_var( 's' ) );
 		endif;
-		
-	 	
-	 	
-	 	
 
 		if( $wp_rewrite->using_permalinks() )
 			$pagination['base'] = user_trailingslashit( trailingslashit( remove_query_arg( 's', get_pagenum_link( 1 ) ) ) . 'page/%#%/', 'paged' );
 		
-		
-
 		$pagination = apply_filters( "loop-shortcode-pagination", $pagination );
 		
  		echo $pagination['before'];
@@ -399,13 +403,20 @@ class CTLT_Loop_Shortcode {
 				case "list":
 					$this->list_output();
 				break;
-
+				
+				case "grid":
+					$this->grid_output();
+				break;
+				
+				case 'json':
+					$this->json_output();
+				break;
+				
 				case "full":
 				default:
 					$this->full_output();
 				break;
-
-
+				
 			}
 
 
@@ -426,7 +437,36 @@ class CTLT_Loop_Shortcode {
 		</p><!-- .no-data -->
 		<?php
 	}
-
+	
+	function grid_output() {
+		
+		
+		if( 0 == $this->grid_column )
+			$this->grid_column = 4; 
+		
+		if( 0 == $this->counter%$this->grid_column ):
+			if(0 != $this->counter ): ?>
+			</div>
+			<?php endif; ?>
+			<div class="expand row-fluid" role="main">
+		<?php 
+		endif;
+		if(  $this->counter%$this->grid_column);
+		$span = ( 12/ $this->grid_column );
+		?>
+	      <div class="span<?php echo $span; ?> loop-grid-item">
+	        <div class="thumbnail">
+	          <!-- <img alt="300x200"  style="width: 300px; height: 200px;" src=""> -->
+	          <div class="caption loop-grid-caption">
+	            <h3 class="loop-gird-title"><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3>
+	            <div class="loop-grid-excerpt"><?php the_excerpt(); ?></div>
+	        </div>
+	        </div>
+	      </div>
+	<?php
+	
+		$this->
+	}
 	/**
 	 * archive_output function.
 	 *
@@ -514,6 +554,38 @@ class CTLT_Loop_Shortcode {
 			<?php endif; ?>
 		</div><!-- .hentry -->
 		<?php
+	}
+	
+	function json_output() {
+		$tags = array();
+		$categories = array();
+		
+		// get the post tags
+		$post_tags = get_the_tags( get_the_ID() );
+		if ($post_tags) {
+			foreach($post_tags as $tag) {
+				$tags[]=  array( 'name' => $tag->name, 'url' => get_tag_link($tag->term_id) , 'slug' => $tag->slug ); 
+			}
+		}
+		// get the post categories
+		$post_categories = get_the_category( get_the_ID() );
+		if ($post_categories) {
+			foreach( $post_categories as $categorie) {
+				$categories[]=  array( 'name' => $categorie->name, 'url' => get_category_link($categorie->term_id) , 'slug' => $categorie->slug ); 
+			}
+		}
+		
+		$this->json_output[] = array( 
+				'title'		=> get_the_title(),
+			   	'content' 	=> get_the_content(),
+			   	'author'  	=> get_the_author(),
+			   	'date'    	=> get_the_date('U')*100, // miliseconds since Unix Epoch (January 1 1970 00:00:00 GMT)
+			   	'meta'    	=> get_post_meta( get_the_ID() ),
+			   	'tags' 		=> $tags,
+			   	'categories' => $categories
+		);
+
+		
 	}
 
 	/**
