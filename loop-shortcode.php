@@ -465,7 +465,7 @@ class CTLT_Loop_Shortcode {
 	      </div>
 	<?php
 	
-		$this->
+		
 	}
 	/**
 	 * archive_output function.
