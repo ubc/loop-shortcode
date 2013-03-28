@@ -171,7 +171,8 @@ class CTLT_Loop_Shortcode {
 				"num" 	=> 10,
 				"error"	=>'',
 				"taxonomy"=>'',
-				'grid_column'=>0
+				'grid_column'=>0,
+				'json_var'  => 'loop_json',
 			), $atts );
 
 		 
@@ -236,8 +237,9 @@ class CTLT_Loop_Shortcode {
 			endwhile;
 			// output json 
 			if( !empty( $this->json_output ) && 'json' == $this->loop_attributes['view'] ):
+			
 				echo '<script type="text/javascript" >';
-				echo 'var loop_json = '.json_encode( $this->json_output );
+				echo 'var '.$this->loop_attributes['json_var'].' = '.json_encode( $this->json_output );
 				echo '</script>';
 				$this->json_output = array();
 			endif;
@@ -578,6 +580,7 @@ class CTLT_Loop_Shortcode {
 		$this->json_output[] = array( 
 				'title'		=> get_the_title(),
 			   	'content' 	=> get_the_content(),
+			   	'excerpt'   => get_the_excerpt(),
 			   	'author'  	=> get_the_author(),
 			   	'date'    	=> get_the_date('U')*100, // miliseconds since Unix Epoch (January 1 1970 00:00:00 GMT)
 			   	'meta'    	=> get_post_meta( get_the_ID() ),
