@@ -577,15 +577,23 @@ class CTLT_Loop_Shortcode {
 			}
 		}
 		
+		$meta = get_post_meta( get_the_ID() );
+		if ( $meta['_thumbnail_id'] ) {
+			$img = wp_get_attachment_image_src( $meta['_thumbnail_id'][0], 'full' );
+		} else {
+			$img = '';
+		}
+		
 		$this->json_output[] = array( 
 				'title'		=> get_the_title(),
 			   	'content' 	=> get_the_content(),
 			   	'excerpt'   => get_the_excerpt(),
 			   	'author'  	=> get_the_author(),
-			   	'date'    	=> get_the_date('U')*1000, // miliseconds since Unix Epoch (January 1 1970 00:00:00 GMT)
-			   	'meta'    	=> get_post_meta( get_the_ID() ),
+			   	'date'    	=> get_the_date('U')*1000, // milliseconds since Unix Epoch (January 1 1970 00:00:00 GMT)
+			   	'meta'    	=> $meta,
 			   	'tags' 		=> $tags,
-			   	'categories' => $categories
+			   	'categories' => $categories,
+			   	'image' 	=> $img[0]
 		);
 
 		
