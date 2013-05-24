@@ -183,6 +183,9 @@ class CTLT_Loop_Shortcode {
 		if($this->loop_attributes['grid_column'])
 			$this->grid_column = $this->loop_attributes['grid_column'];
 		
+		if ( !empty($this->loop_attributes['error']) )
+			$this->error = $this->loop_attributes['error'];
+
 		ob_start();
 
 		if( !empty( $this->loop_attributes['query'] ) ):
