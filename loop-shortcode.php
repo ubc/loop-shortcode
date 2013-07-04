@@ -235,6 +235,9 @@ class CTLT_Loop_Shortcode {
 					
 					if($current_user->ID > 0 ) {
 						$query .= "&author=".$current_user->ID;
+					} else {
+						$this->show_error();
+						return;
 					}
 				break;
 				default:
