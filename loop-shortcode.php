@@ -3,7 +3,7 @@
 * Plugin Name: Loop Shortcode
 * Plugin URI: 
 * Description: A [loop] shortcode plugin.
-* Version: 1.0
+* Version: 1.1
 * Author: UBC CMS
 * Author URI:http://cms.ubc.ca
 *
@@ -173,6 +173,7 @@ class CTLT_Loop_Shortcode {
 				"taxonomy"=>'',
 				'grid_column'=>0,
 				'json_var'  => 'loop_json',
+				'author' => '',
 			), $atts );
 
 		 
@@ -223,6 +224,31 @@ class CTLT_Loop_Shortcode {
 		endif;
 		if( $this->loop_attributes['pagination'] ):
 			$query .= "&paged=".get_query_var( 'paged' );
+		endif;
+		
+		if( $this->loop_attributes['author'] ):
+			
+			switch( $this->loop_attributes['author'] ) {
+				case 'current_user':
+					
+					$current_user = wp_get_current_user();
+					
+					if($current_user->ID > 0 ) {
+						$query .= "&author=".$current_user->ID;
+					} else {
+						$this->show_error();
+						return;
+					}
+				break;
+				default:
+					if( is_numeric( $this->loop_attributes['author']) ) {
+						$query .= '&author='.$this->loop_attributes['author'];
+					} else {
+						$query .= '&author_name='.$this->loop_attributes['author'];
+					}
+				break;
+			}
+			
 		endif;
 		
 		$this->loop_query = new WP_Query( $query );
