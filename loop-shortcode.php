@@ -71,16 +71,14 @@ class CTLT_Loop_Shortcode {
 	function remove_wanted_p( $content ){
 		
 		$content = trim($content);
-		// remove the first p
-		if( strpos($content, '</p>') == 0  )
-			$content = substr($content, 4);
-		// remove the last p
-		if( substr($content, -3) == '<p>'  )
-			$content = substr($content, 0, -3);
+		// remove the opening <p> tag
+		if( strpos($content, '<p>') === 0  )
+			$content = substr($content, 3);
+		// remove the closing </p> tag
+		if( strcasecmp(substr($content, -4), '</p>') === 0 )
+			$content = substr($content, 0, -4);
 		
 		return $content;
-		
-	
 	}
 
 	/**
