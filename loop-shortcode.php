@@ -72,7 +72,7 @@ class CTLT_Loop_Shortcode {
 		
 		$content = trim($content);
 		// remove the opening <p> tag
-		if( strpos($content, '<p>') === 0  )
+		if( strcasecmp(substr($content, 0, 3), '<p>') === 0  )
 			$content = substr($content, 3);
 		// remove the closing </p> tag
 		if( strcasecmp(substr($content, -4), '</p>') === 0 )
