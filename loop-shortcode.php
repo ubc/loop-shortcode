@@ -71,12 +71,13 @@ class CTLT_Loop_Shortcode {
 	function remove_wanted_p( $content ){
 		
 		$content = trim($content);
-		// remove the first p
-		if( strpos($content, '</p>') == 0  )
-			$content = substr($content, 4);
 		// remove the last p
-		if( substr($content, -3) == '<p>'  )
+		if( substr($content, -3) === '<p>'  )
 			$content = substr($content, 0, -3);
+		// remove the first p
+		if( strpos($content, '</p>') === 0  )
+			$content = substr($content, 4);
+		
 		
 		return $content;
 		
