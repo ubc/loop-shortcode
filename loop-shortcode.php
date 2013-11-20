@@ -72,10 +72,10 @@ class CTLT_Loop_Shortcode {
 		
 		$content = trim($content);
 		// remove the opening <p> tag
-		if( strcasecmp(substr($content, 0, 3), '<p>') === 0  )
+		if( strcasecmp(substr($content, 0, 3), '<p>') === 0 || strcasecmp(substr($content, 0, 3), '<P>') === 0 )
 			$content = substr($content, 3);
 		// remove the closing </p> tag
-		if( strcasecmp(substr($content, -4), '</p>') === 0 )
+		if( strcasecmp(substr($content, -4), '</p>') === 0 || strcasecmp(substr($content, -4), '</P>') === 0)
 			$content = substr($content, 0, -4);
 		
 		return $content;
@@ -172,6 +172,8 @@ class CTLT_Loop_Shortcode {
 				'grid_column'=>0,
 				'json_var'  => 'loop_json',
 				'author' => '',
+				'time_after' =>'',
+				'time_before'=>'',
 			), $atts );
 
 		 
@@ -248,8 +250,9 @@ class CTLT_Loop_Shortcode {
 			}
 			
 		endif;
+		$query_array =  wp_parse_args( $query );
 		
-		$this->loop_query = new WP_Query( $query );
+		$this->loop_query = new WP_Query( $query_array );
 		
 		$this->total_pages = $this->loop_query->max_num_pages;
 		
