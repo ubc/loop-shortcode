@@ -71,6 +71,7 @@ class CTLT_Loop_Shortcode {
 	function remove_wanted_p( $content ){
 		
 		$content = trim($content);
+<<<<<<< HEAD
 		// remove the last p
 		if( substr($content, -3) === '<p>'  )
 			$content = substr($content, 0, -3);
@@ -78,10 +79,16 @@ class CTLT_Loop_Shortcode {
 		if( strpos($content, '</p>') === 0  )
 			$content = substr($content, 4);
 		
+=======
+		// remove the opening <p> tag
+		if( strcasecmp(substr($content, 0, 3), '<p>') === 0 || strcasecmp(substr($content, 0, 3), '<P>') === 0 )
+			$content = substr($content, 3);
+		// remove the closing </p> tag
+		if( strcasecmp(substr($content, -4), '</p>') === 0 || strcasecmp(substr($content, -4), '</P>') === 0)
+			$content = substr($content, 0, -4);
+>>>>>>> jhnbrnn-master
 		
 		return $content;
-		
-	
 	}
 
 	/**
@@ -175,6 +182,8 @@ class CTLT_Loop_Shortcode {
 				'grid_column'=>0,
 				'json_var'  => 'loop_json',
 				'author' => '',
+				'time_after' =>'',
+				'time_before'=>'',
 			), $atts );
 
 		 
@@ -251,8 +260,9 @@ class CTLT_Loop_Shortcode {
 			}
 			
 		endif;
+		$query_array =  wp_parse_args( $query );
 		
-		$this->loop_query = new WP_Query( $query );
+		$this->loop_query = new WP_Query( $query_array );
 		
 		$this->total_pages = $this->loop_query->max_num_pages;
 		
