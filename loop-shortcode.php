@@ -71,22 +71,13 @@ class CTLT_Loop_Shortcode {
 	function remove_wanted_p( $content ){
 		
 		$content = trim($content);
-<<<<<<< HEAD
-		// remove the last p
-		if( substr($content, -3) === '<p>'  )
-			$content = substr($content, 0, -3);
-		// remove the first p
-		if( strpos($content, '</p>') === 0  )
-			$content = substr($content, 4);
-		
-=======
+
 		// remove the opening <p> tag
 		if( strcasecmp(substr($content, 0, 3), '<p>') === 0 || strcasecmp(substr($content, 0, 3), '<P>') === 0 )
 			$content = substr($content, 3);
 		// remove the closing </p> tag
 		if( strcasecmp(substr($content, -4), '</p>') === 0 || strcasecmp(substr($content, -4), '</P>') === 0)
 			$content = substr($content, 0, -4);
->>>>>>> jhnbrnn-master
 		
 		return $content;
 	}
@@ -172,21 +163,26 @@ class CTLT_Loop_Shortcode {
 		$this->content = $content;
 		
 		$this->loop_attributes = shortcode_atts(array(
-				"query" => '',
-				"rss" 	=> '',
-				"view" 	=>'default',
-				"pagination" => false,
-				"num" 	=> 10,
-				"error"	=>'',
-				"taxonomy"=>'',
-				'grid_column'=>0,
-				'json_var'  => 'loop_json',
-				'author' => '',
-				'time_after' =>'',
-				'time_before'=>'',
+				"query" 		=> '',
+				"rss" 			=> '',
+				"view" 			=> 'default',
+				"pagination" 	=> false,
+				"num" 			=> 10,
+				"error"			=> '',
+				"taxonomy"		=> '',
+				'grid_column'	=> 0,
+				'json_var'  	=> 'loop_json',
+				'author'	 	=> '',
+				'time_after' 	=> '',
+				'time_before'	=> '',
+				'time_inclusive'=> true
 			), $atts );
-
-		 
+		if( in_array( $this->loop_attributes['pagination'], array( 'false','0','null', false ) ) )
+			$this->loop_attributes['pagination'] = false;
+		
+		if( in_array( $this->loop_attributes['time_inclusive'], array( 'false','0','null', false ) ) )
+			$this->loop_attributes['time_inclusive'] = false; 
+			
 		if( empty( $this->loop_attributes['query'] ) && empty( $this->loop_attributes['rss'] ) ) {
 			return '<span class="error no-data">'.__('Please specify a query for your [ loop ] shortcode.', 'loop-shortcode').'</span>';
 		}
@@ -261,6 +257,16 @@ class CTLT_Loop_Shortcode {
 			
 		endif;
 		$query_array =  wp_parse_args( $query );
+		
+		if( $this->loop_attributes['time_before'] || $this->loop_attributes['time_after']):
+			$query_array['date_query'] = array(
+								array(
+									'after'     => $this->loop_attributes['time_after'],
+									'before'    => $this->loop_attributes['time_before'],
+									'inclusive' => $this->loop_attributes['time_inclusive'],
+								),
+							);
+		endif;
 		
 		$this->loop_query = new WP_Query( $query_array );
 		
