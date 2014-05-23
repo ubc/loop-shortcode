@@ -267,6 +267,12 @@ class CTLT_Loop_Shortcode {
 								),
 							);
 		endif;
+
+		// Attempt to stop recursion by never allowing a post to call itself.
+		global $post;
+		$mainPostID = $post->ID;
+
+		$query_array['post__not_in'] = array( $mainPostID );
 		
 		$this->loop_query = new WP_Query( $query_array );
 		
@@ -278,7 +284,6 @@ class CTLT_Loop_Shortcode {
 				$this->display_output();
 				$this->odd_or_even++;
 				$this->counter++;
-				
 
 			endwhile;
 			// output json 
@@ -436,7 +441,7 @@ class CTLT_Loop_Shortcode {
 		
 		if( !$post->ID )
 			return '';
-		
+
 		if( $this->content  ):
 
 			echo apply_filters( 'loop_content', $this->content );
