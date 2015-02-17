@@ -229,7 +229,13 @@ class CTLT_Loop_Shortcode {
 			 $query .= "&posts_per_page=".$this->loop_attributes['num'];
 		endif;
 		if( $this->loop_attributes['pagination'] ):
-			$query .= "&paged=".get_query_var( 'paged' );
+			$paged = get_query_var( 'paged' );
+            if (!$paged) {
+                $paged = get_query_var( 'page' ) ? get_query_var( 'page' ) : 1;
+                global $wp_query;
+                $wp_query->query_vars['paged'] = $paged;
+            }
+            $query .= "&paged=".$paged;
 		endif;
 		
 		if( $this->loop_attributes['author'] ):
