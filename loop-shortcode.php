@@ -258,9 +258,9 @@ class CTLT_Loop_Shortcode {
 		endif;
 		$query_array =  wp_parse_args( $query );
 
-		if( strpos($query_array[tag], "current_post") !== false):
+		if( strpos($query_array['tag'], "current_post") !== false):
 			$current_post = get_the_id();
-			$query_array[tag] = str_replace("current_post", $current_post, $query_array[tag]);
+			$query_array['tag'] = str_replace("current_post", $current_post, $query_array['tag']);
 		endif;
 
 		if( $this->loop_attributes['time_before'] || $this->loop_attributes['time_after']):
