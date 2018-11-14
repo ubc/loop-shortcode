@@ -239,9 +239,6 @@ class CTLT_Loop_Shortcode {
 			$query
 		);
 
-		file_put_contents( WP_CONTENT_DIR . '/debug.log', print_r( array( $query ), true ), FILE_APPEND );
-
-
 		if( strpos( $query, 'posts_per_page=' ) === false ):
 			 $query .= "&posts_per_page=".$this->loop_attributes['num'];
 		endif;
