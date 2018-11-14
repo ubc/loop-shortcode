@@ -270,7 +270,24 @@ class CTLT_Loop_Shortcode {
 			}
 
 		endif;
+
 		$query_array =  wp_parse_args( $query );
+
+		$items_to_convert_csv_to_array = array(
+			'category__and',
+		);
+
+		foreach ( $items_to_convert_csv_to_array as $id => $item ) {
+
+			if ( ! isset( $query_array[ $item ] ) ) {
+				continue;
+			}
+
+			$value_to_convert = $query_array[ $item ];
+			$usable_array     = str_getcsv( trim( $value_to_convert, "'" ), ',' );
+
+			$query_array[ $item ] = $usable_array;
+		}
 
 		if ( isset( $query_array['tag'] ) && strpos( $query_array['tag'], 'current_post' ) !== false ) {
 			$current_post       = get_the_id();
@@ -292,7 +309,7 @@ class CTLT_Loop_Shortcode {
 		$mainPostID = $post->ID;
 
 		$query_array['post__not_in'] = array( $mainPostID );
-
+		file_put_contents( WP_CONTENT_DIR . '/debug.log', print_r( array( $query_array, json_decode( json_encode( $query_array ), true ) ), true ), FILE_APPEND );
 		$this->loop_query = new WP_Query( $query_array );
 
 		$this->total_pages = $this->loop_query->max_num_pages;
