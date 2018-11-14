@@ -87,7 +87,7 @@ class CTLT_Loop_Shortcode {
 	 *
 	 * @access public
 	 * @param mixed $shortcode
-	 * @return void
+	 * @return bool
 	 */
 	function has_shortcode( $shortcode ) {
 		global $shortcode_tags;
@@ -127,7 +127,7 @@ class CTLT_Loop_Shortcode {
 	 * odd_even_shortcode function.
 	 *
 	 * @access public
-	 * @return void
+	 * @return string
 	 */
 	public function odd_even_shortcode(){
 
@@ -144,7 +144,7 @@ class CTLT_Loop_Shortcode {
 	 * @access public
 	 * @param mixed $atts
 	 * @param mixed $content (default: null)
-	 * @return void
+	 * @return mixed
 	 */
 	public function loop_shortcode( $atts, $content = null ) {
 		global $wp_query;
@@ -309,7 +309,7 @@ class CTLT_Loop_Shortcode {
 		$mainPostID = $post->ID;
 
 		$query_array['post__not_in'] = array( $mainPostID );
-		file_put_contents( WP_CONTENT_DIR . '/debug.log', print_r( array( $query_array, json_decode( json_encode( $query_array ), true ) ), true ), FILE_APPEND );
+
 		$this->loop_query = new WP_Query( $query_array );
 
 		$this->total_pages = $this->loop_query->max_num_pages;
@@ -470,7 +470,7 @@ class CTLT_Loop_Shortcode {
 	 * display_output function.
 	 *
 	 * @access public
-	 * @return void
+	 * @return mixed
 	 */
 	function display_output(){
 		global $post;
@@ -520,7 +520,7 @@ class CTLT_Loop_Shortcode {
 			if( empty( $this->error ) ):
 				 _e('Sorry, no posts matched your criteria.', 'loop-shortcode');
 			 else:
-			 	echo $this->error;
+			 	echo wp_kses_post( $this->error );
 			 endif;
 				?>
 		</p><!-- .no-data -->
