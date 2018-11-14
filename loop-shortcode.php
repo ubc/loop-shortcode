@@ -1,13 +1,13 @@
 <?php
 /*
 * Plugin Name: Loop Shortcode
-* Plugin URI: 
+* Plugin URI:
 * Description: A [loop] shortcode plugin.
 * Version: 1.1
 * Author: UBC CMS
 * Author URI:http://cms.ubc.ca
 *
-* 
+*
 * This program is free software; you can redistribute it and/or modify it under the terms of the GNU
 * General Public License as published by the Free Software Foundation; either version 2 of the License,
 * or (at your option) any later version.
@@ -26,7 +26,7 @@
  * CTLT_Loop_Shortcode class.
  */
 class CTLT_Loop_Shortcode {
-	
+
 	public $loop_type = null;
 	public $odd_or_even = 0;
 	public $content = '';
@@ -54,7 +54,7 @@ class CTLT_Loop_Shortcode {
 		add_filter( 'loop_content', 'shortcode_unautop' );
 		add_filter( 'loop_content', 'do_shortcode' );
 		add_filter( 'loop_content', array( &$this, 'remove_wanted_p' ) );
-		
+
 		add_filter( 'post_thumbnail_html',  array( &$this,'feed_post_thumbnail_html' ) , 10 , 5 );
 		add_filter( 'the_author', array( &$this,'feed_post_author' ) , 10 , 5);
 		add_filter( 'the_modified_author', array( &$this,'feed_post_author' ) , 10 , 5);
@@ -62,14 +62,14 @@ class CTLT_Loop_Shortcode {
 
 		add_filter( 'the_author_posts_link' , array( &$this,'feed_post_author_link' ) , 10 , 5);
 		add_filter( 'author_link' , array( &$this,'feed_post_author_link' ) , 10 , 5);
-		
+
 
 		//  There is no point trying to get links to categories or tags from feed since you can't get one reliably. =(
 
 	}
-	
+
 	function remove_wanted_p( $content ){
-		
+
 		$content = trim($content);
 
 		// remove the opening <p> tag
@@ -78,7 +78,7 @@ class CTLT_Loop_Shortcode {
 		// remove the closing </p> tag
 		if( strcasecmp(substr($content, -4), '</p>') === 0 || strcasecmp(substr($content, -4), '</P>') === 0)
 			$content = substr($content, 0, -4);
-		
+
 		return $content;
 	}
 
@@ -117,7 +117,7 @@ class CTLT_Loop_Shortcode {
 	 * @return void
 	 */
 	public function register_shortcode() {
-		
+
 		/* don't do anything if the shortcode exists already */
 		$this->add_shortcode( 'loop', 'loop_shortcode' );
 		$this->add_shortcode( 'odd-even', 'odd_even_shortcode' );
@@ -161,7 +161,7 @@ class CTLT_Loop_Shortcode {
 
 		$wp_query->is_singular = false;
 		$this->content = $content;
-		
+
 		$this->loop_attributes = shortcode_atts(array(
 				"query" 		=> '',
 				"rss" 			=> '',
@@ -179,17 +179,17 @@ class CTLT_Loop_Shortcode {
 			), $atts );
 		if( in_array( $this->loop_attributes['pagination'], array( 'false','0','null', false ) ) )
 			$this->loop_attributes['pagination'] = false;
-		
+
 		if( in_array( $this->loop_attributes['time_inclusive'], array( 'false','0','null', false ) ) )
-			$this->loop_attributes['time_inclusive'] = false; 
-			
+			$this->loop_attributes['time_inclusive'] = false;
+
 		if( empty( $this->loop_attributes['query'] ) && empty( $this->loop_attributes['rss'] ) ) {
 			return '<span class="error no-data">'.__('Please specify a query for your [ loop ] shortcode.', 'loop-shortcode').'</span>';
 		}
-		
+
 		if($this->loop_attributes['grid_column'])
 			$this->grid_column = $this->loop_attributes['grid_column'];
-		
+
 		if ( !empty($this->loop_attributes['error']) )
 			$this->error = $this->loop_attributes['error'];
 
@@ -211,7 +211,6 @@ class CTLT_Loop_Shortcode {
 		return 	ob_get_clean();
 	}
 
-
 	/**
 	 * wp_loop function.
 	 *
@@ -219,26 +218,44 @@ class CTLT_Loop_Shortcode {
 	 * @return void
 	 */
 	function wp_loop(){
+
 		$this->loop_type = 'wp';
 		// de-funkify $query - taken from http://digwp.com/2010/01/custom-query-shortcode/ needed to get it working better ideas ?
 		$query = html_entity_decode( $this->loop_attributes['query'] );
-		$query = preg_replace('~&#x0*([0-9a-f]+);~ei', 'chr(hexdec("\\1"))', $query);
-		$query = preg_replace('~&#0*([0-9]+);~e', 'chr(\\1)', $query);
-		
+
+		$query = preg_replace_callback(
+			'~&#x0*([0-9a-f]+);~i',
+			function( $matches ) {
+				return chr( hexdec( $matches[1] ) );
+			},
+			$query
+		);
+
+		$query = preg_replace_callback(
+			'~&#0*([0-9]+);~',
+			function( $matches ) {
+				return chr( $matches[1] );
+			},
+			$query
+		);
+
+		file_put_contents( WP_CONTENT_DIR . '/debug.log', print_r( array( $query ), true ), FILE_APPEND );
+
+
 		if( strpos( $query, 'posts_per_page=' ) === false ):
 			 $query .= "&posts_per_page=".$this->loop_attributes['num'];
 		endif;
 		if( $this->loop_attributes['pagination'] ):
 			$query .= "&paged=".get_query_var( 'paged' );
 		endif;
-		
+
 		if( $this->loop_attributes['author'] ):
-			
+
 			switch( $this->loop_attributes['author'] ) {
 				case 'current_user':
-					
+
 					$current_user = wp_get_current_user();
-					
+
 					if($current_user->ID > 0 ) {
 						$query .= "&author=".$current_user->ID;
 					} else {
@@ -254,14 +271,14 @@ class CTLT_Loop_Shortcode {
 					}
 				break;
 			}
-			
+
 		endif;
 		$query_array =  wp_parse_args( $query );
 
-		if( strpos($query_array['tag'], "current_post") !== false):
-			$current_post = get_the_id();
-			$query_array['tag'] = str_replace("current_post", $current_post, $query_array['tag']);
-		endif;
+		if ( isset( $query_array['tag'] ) && strpos( $query_array['tag'], 'current_post' ) !== false ) {
+			$current_post       = get_the_id();
+			$query_array['tag'] = str_replace( 'current_post', $current_post, $query_array['tag'] );
+		}
 
 		if( $this->loop_attributes['time_before'] || $this->loop_attributes['time_after']):
 			$query_array['date_query'] = array(
@@ -278,11 +295,11 @@ class CTLT_Loop_Shortcode {
 		$mainPostID = $post->ID;
 
 		$query_array['post__not_in'] = array( $mainPostID );
-		
+
 		$this->loop_query = new WP_Query( $query_array );
-		
+
 		$this->total_pages = $this->loop_query->max_num_pages;
-		
+
 		if ( $this->loop_query->have_posts() ) :
 			while ( $this->loop_query->have_posts() ) : $this->loop_query->the_post();
 
@@ -291,15 +308,15 @@ class CTLT_Loop_Shortcode {
 				$this->counter++;
 
 			endwhile;
-			// output json 
+			// output json
 			if( !empty( $this->json_output ) && 'json' == $this->loop_attributes['view'] ):
-			
+
 				echo '<script type="text/javascript" >';
 				echo 'var '.$this->loop_attributes['json_var'].' = '.json_encode( $this->json_output );
 				echo '</script>';
 				$this->json_output = array();
 			endif;
-			
+
 			$this->paginate();
 
 		else:
@@ -323,25 +340,25 @@ class CTLT_Loop_Shortcode {
 
 		$rss = fetch_feed( $this->loop_attributes['rss'] );
 		$num = $this->loop_attributes['num'];
-		
+
 		$paged = get_query_var( 'paged' );
-		
+
 		if($paged > 0 )
 			$paged--;
 		else
 			$paged = 0;
-		
+
 		$start = $num*$paged;
-		
+
 		// todo: make pagination work for rss as well
 
 		if (!is_wp_error( $rss ) ) :
 
 			$maxitems = $rss->get_item_quantity();
 			$rss_items = $rss->get_items($start, $num);
-		
+
 		endif;
-		
+
 		$this->total_pages = ceil ( $maxitems / $num );
 		$found_posts = 0;
 		foreach ($rss_items as $item):
@@ -368,7 +385,7 @@ class CTLT_Loop_Shortcode {
 		// $rss_mock_query->post_count = $maxitems;
 		$rss_mock_query->found_posts = ''. $found_posts;
 		$rss_mock_query->post_count = $num;
-		
+
 
 		if ( $rss_mock_query->have_posts() ) :
 			while ( $rss_mock_query->have_posts() ) : $rss_mock_query->the_post();
@@ -384,10 +401,10 @@ class CTLT_Loop_Shortcode {
 		else:
 			$this->show_error();
 		endif;
-		
+
 		wp_reset_query();
 	}
-	
+
 	/**
 	 * paginate function.
 	 *
@@ -403,7 +420,7 @@ class CTLT_Loop_Shortcode {
 		global $wp_query, $wp_rewrite;
 
 		$wp_query->query_vars['paged'] > 1 ? $current = $wp_query->query_vars['paged'] : $current = 1;
-	
+
 		$pagination = array(
 			'before' => '',
 			'after'  => '',
@@ -416,20 +433,20 @@ class CTLT_Loop_Shortcode {
 			'next_text' => '&raquo;',
 			'prev_text' => '&laquo;'
 		);
-		
+
 		if( !empty( $this->loop_query->query_vars['s'] ) ):
 			$pagination['add_args'] = array( 's' => get_query_var( 's' ) );
 		endif;
 
 		if( $wp_rewrite->using_permalinks() )
 			$pagination['base'] = user_trailingslashit( trailingslashit( remove_query_arg( 's', get_pagenum_link( 1 ) ) ) . 'page/%#%/', 'paged' );
-		
+
 		$pagination = apply_filters( "loop-shortcode-pagination", $pagination );
-		
+
  		echo $pagination['before'];
 		echo paginate_links( $pagination );
 		echo $pagination['after'];
-		
+
 	}
 
 
@@ -443,7 +460,7 @@ class CTLT_Loop_Shortcode {
 	 */
 	function display_output(){
 		global $post;
-		
+
 		if( !$post->ID )
 			return '';
 
@@ -461,20 +478,20 @@ class CTLT_Loop_Shortcode {
 				case "list":
 					$this->list_output();
 				break;
-				
+
 				case "grid":
 					$this->grid_output();
 				break;
-				
+
 				case 'json':
 					$this->json_output();
 				break;
-				
+
 				case "full":
 				default:
 					$this->full_output();
 				break;
-				
+
 			}
 
 
@@ -495,19 +512,19 @@ class CTLT_Loop_Shortcode {
 		</p><!-- .no-data -->
 		<?php
 	}
-	
+
 	function grid_output() {
-		
-		
+
+
 		if( 0 == $this->grid_column )
-			$this->grid_column = 4; 
-		
+			$this->grid_column = 4;
+
 		if( 0 == $this->counter%$this->grid_column ):
 			if(0 != $this->counter ): ?>
 			</div>
 			<?php endif; ?>
 			<div class="expand row-fluid" role="main">
-		<?php 
+		<?php
 		endif;
 		if(  $this->counter%$this->grid_column);
 		$span = ( 12/ $this->grid_column );
@@ -522,8 +539,8 @@ class CTLT_Loop_Shortcode {
 	        </div>
 	      </div>
 	<?php
-	
-		
+
+
 	}
 	/**
 	 * archive_output function.
@@ -613,34 +630,34 @@ class CTLT_Loop_Shortcode {
 		</div><!-- .hentry -->
 		<?php
 	}
-	
+
 	function json_output() {
 		$tags = array();
 		$categories = array();
-		
+
 		// get the post tags
 		$post_tags = get_the_tags( get_the_ID() );
 		if ($post_tags) {
 			foreach($post_tags as $tag) {
-				$tags[]=  array( 'name' => $tag->name, 'url' => get_tag_link($tag->term_id) , 'slug' => $tag->slug ); 
+				$tags[]=  array( 'name' => $tag->name, 'url' => get_tag_link($tag->term_id) , 'slug' => $tag->slug );
 			}
 		}
 		// get the post categories
 		$post_categories = get_the_category( get_the_ID() );
 		if ($post_categories) {
 			foreach( $post_categories as $categorie) {
-				$categories[]=  array( 'name' => $categorie->name, 'url' => get_category_link($categorie->term_id) , 'slug' => $categorie->slug ); 
+				$categories[]=  array( 'name' => $categorie->name, 'url' => get_category_link($categorie->term_id) , 'slug' => $categorie->slug );
 			}
 		}
-		
+
 		$meta = get_post_meta( get_the_ID() );
 		if ( $meta['_thumbnail_id'] ) {
 			$img = wp_get_attachment_image_src( $meta['_thumbnail_id'][0], 'full' );
 		} else {
 			$img = '';
 		}
-		
-		$this->json_output[] = array( 
+
+		$this->json_output[] = array(
 				'title'		=> get_the_title(),
 			   	'content' 	=> get_the_content(),
 			   	'excerpt'   => get_the_excerpt(),
@@ -652,7 +669,7 @@ class CTLT_Loop_Shortcode {
 			   	'image' 	=> $img[0]
 		);
 
-		
+
 	}
 
 	/**
@@ -664,9 +681,9 @@ class CTLT_Loop_Shortcode {
 	function entry_meta(){
 
 	}
-	
+
 	/* helper filters */
-	
+
 	/**
 	 * feed_post_thumbnail_html function.
 	 *
