@@ -275,6 +275,10 @@ class CTLT_Loop_Shortcode {
 
 		$items_to_convert_csv_to_array = array(
 			'category__and',
+			'post__in',
+			'post__not_in',
+			'post_parent__in',
+			'post_parent__not_in',
 		);
 
 		foreach ( $items_to_convert_csv_to_array as $id => $item ) {
