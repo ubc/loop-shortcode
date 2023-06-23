@@ -279,6 +279,7 @@ class CTLT_Loop_Shortcode {
 			'post__not_in',
 			'post_parent__in',
 			'post_parent__not_in',
+			'category__not_in'
 		);
 
 		foreach ( $items_to_convert_csv_to_array as $id => $item ) {
